@@ -413,8 +413,8 @@ GROUP BY user_id, owner_id, DATE(created_at)
 ORDER BY updated DESC
 LIMIT 50
 SQL;
-    $footprints = db_execute($query, array(current_user()['id']))->fetchAll();
-    $app->render('footprints.php', array('footprints' => $footprints));
+    $footprints = db_execute($query, [current_user()['id']])->fetchAll();
+    $app->render('footprints.php', ['footprints' => $footprints]);
 });
 
 $app->get('/friends', function () use ($app) {
