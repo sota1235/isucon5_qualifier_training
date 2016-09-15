@@ -25,6 +25,13 @@ class Isucon5View extends \Slim\View
     }
 }
 
+// redis client
+$redis = new Predis\Client([
+    'scheme' => 'tcp',
+    'host'   => 'localhost',
+    'port'   => 6379,
+]);
+
 $app = new \Slim\Slim(array(
     'view' => new Isucon5View(),
     'db' => array(
