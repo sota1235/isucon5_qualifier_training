@@ -200,11 +200,14 @@ $app->get('/logout', function () use ($app) {
 $app->get('/', function () use ($app) {
     authenticated();
 
-    $profile = db_execute('SELECT * FROM profiles WHERE user_id = ?', array(current_user()['id']))->fetch();
+    $user   = current_user();
+    $userId = $user['id'];
+
+    $profile = db_execute('SELECT * FROM profiles WHERE user_id = ?', [$userId])->fetch();
 
     $entries_query = 'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5';
-    $stmt = db_execute($entries_query, array(current_user()['id']));
-    $entries = array();
+    $stmt = db_execute($entries_query, [$userId]);
+    $entries = [];
     while ($entry = $stmt->fetch()) {
         $entry['is_private'] = ($entry['private'] == 1);
         list($title, $content) = preg_split('/\n/', $entry['body'], 2);
@@ -221,9 +224,9 @@ WHERE e.user_id = ?
 ORDER BY c.created_at DESC
 LIMIT 10
 SQL;
-    $comments_for_me = db_execute($comments_for_me_query, array(current_user()['id']))->fetchAll();
+    $comments_for_me = db_execute($comments_for_me_query, [$userId])->fetchAll();
 
-    $entries_of_friends = array();
+    $entries_of_friends = [];
     $stmt = db_execute('SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000');
     while ($entry = $stmt->fetch()) {
         if (!is_friend($entry['user_id'])) continue;
@@ -233,7 +236,7 @@ SQL;
         if (sizeof($entries_of_friends) >= 10) break;
     }
 
-    $comments_of_friends = array();
+    $comments_of_friends = [];
     $stmt = db_execute('SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000');
     while ($comment = $stmt->fetch()) {
         if (!is_friend($comment['user_id'])) continue;
@@ -246,9 +249,9 @@ SQL;
 
     $friends_query = 'SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC';
     $friends = array();
-    $stmt = db_execute($friends_query, array(current_user()['id'], current_user()['id']));
+    $stmt = db_execute($friends_query, [$userId, $userId]);
     while ($rel = $stmt->fetch()) {
-        $key = ($rel['one'] == current_user()['id'] ? 'another' : 'one');
+        $key = ($rel['one'] == $userId ? 'another' : 'one');
         if (!isset($friends[$rel[$key]])) $friends[$rel[$key]] = $rel['created_at'];
     }
 
@@ -260,10 +263,10 @@ GROUP BY user_id, owner_id, DATE(created_at)
 ORDER BY updated DESC
 LIMIT 10
 SQL;
-    $footprints = db_execute($query, array(current_user()['id']))->fetchAll();
+    $footprints = db_execute($query, [$userId])->fetchAll();
 
     $locals = array(
-        'user' => current_user(),
+        'user' => $user,
         'profile' => $profile,
         'entries' => $entries,
         'comments_for_me' => $comments_for_me,
@@ -370,11 +373,11 @@ $app->get('/diary/entry/:entry_id', function ($entry_id) use ($app) {
     }
     $comments = db_execute('SELECT * FROM comments WHERE entry_id = ?', array($entry['id']))->fetchAll();
     mark_footprint($owner['id']);
-    $locals = array(
-        'owner' => $owner,
-        'entry' => $entry,
+    $locals = [
+        'owner'    => $owner,
+        'entry'    => $entry,
         'comments' => $comments,
-    );
+    ];
     $app->render('entry.php', $locals);
 });
 
