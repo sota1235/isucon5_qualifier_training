@@ -424,10 +424,15 @@ $app->get('/friends', function () use ($app) {
     $user = current_user();
     $userId = $user['id'];
     $stmt = db_execute($query, [$userId, $userId]);
+
     while ($rel = $stmt->fetch()) {
         $key = ($rel['one'] == $userId ? 'another' : 'one');
-        if (!isset($friends[$rel[$key]])) $friends[$rel[$key]] = $rel['created_at'];
+
+        if (!isset($friends[$rel[$key]])) {
+            $friends[$rel[$key]] = $rel['created_at'];
+        }
     }
+
     $app->render('friends.php', ['friends' => $friends]);
 });
 
