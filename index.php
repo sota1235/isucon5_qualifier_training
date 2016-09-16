@@ -188,6 +188,19 @@ function prefectures()
     return $PREFS;
 }
 
+function getProfile($userId)
+{
+    global $redis;
+    if ($profile = $redis->get("profiles:$userId")) {
+        return json_decode($profile, true);
+    }
+
+    $profile = db_execute('SELECT * FROM profiles WHERE user_id = ?', [$userId])->fetch();
+    $redis->set("profiles:$userId", json_encode($profile));
+
+    return $profile;
+}
+
 $app->get('/login', function () use ($app) {
     $app->view->setLayout(null);
     $app->render('login.php', array('message' => '高負荷に耐えられるSNSコミュニティサイトへようこそ!'));
@@ -204,13 +217,13 @@ $app->get('/logout', function () use ($app) {
     $app->redirect('/login');
 });
 
-$app->get('/', function () use ($app) {
+$app->get('/', function () use ($app, $redis) {
     authenticated();
 
     $user   = current_user();
     $userId = $user['id'];
 
-    $profile = db_execute('SELECT * FROM profiles WHERE user_id = ?', [$userId])->fetch();
+    $profile = getProfile($userId);
 
     $entries_query = 'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5';
     $stmt = db_execute($entries_query, [$userId]);
@@ -295,7 +308,7 @@ SQL;
 $app->get('/profile/:account_name', function ($account_name) use ($app) {
     authenticated();
     $owner = user_from_account($account_name);
-    $prof = db_execute('SELECT * FROM profiles WHERE user_id = ?', array($owner['id']))->fetch();
+    $prof = getProfile($owner['id']);
     if (!$prof) $prof = array();
     if (permitted($owner['id'])) {
         $query = 'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5';
@@ -321,7 +334,7 @@ $app->get('/profile/:account_name', function ($account_name) use ($app) {
     $app->render('profile.php', $locals);
 });
 
-$app->post('/profile/:account_name', function ($account_name) use ($app) {
+$app->post('/profile/:account_name', function ($account_name) use ($app, $redis) {
     authenticated();
     if ($account_name != current_user()['account_name']) {
         abort_permission_denied();
@@ -329,14 +342,16 @@ $app->post('/profile/:account_name', function ($account_name) use ($app) {
     $params = $app->request->params();
     $args = array($params['first_name'], $params['last_name'], $params['sex'], $params['birthday'], $params['pref']);
 
-    $prof = db_execute('SELECT * FROM profiles WHERE user_id = ?', array(current_user()['id']))->fetch();
+    $prof = getProfile(current_user()['id']);
     if ($prof) {
       $query = <<<SQL
 UPDATE profiles
 SET first_name=?, last_name=?, sex=?, birthday=?, pref=?, updated_at=CURRENT_TIMESTAMP()
 WHERE user_id = ?
 SQL;
-      $args[] = current_user()['id'];
+      $userId = current_user()['id'];
+      $redis->del("profiles:$userId");
+      $args[] = $userId;
     } else {
       $query = <<<SQL
 INSERT INTO profiles (user_id,first_name,last_name,sex,birthday,pref) VALUES (?,?,?,?,?,?)
