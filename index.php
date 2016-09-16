@@ -164,6 +164,9 @@ function is_friend_account($account_name)
     return is_friend(user_from_account($account_name)['id']);
 }
 
+/**
+ * 非公開記事を見てもいいかどうか
+ */
 function permitted($another_id)
 {
     return $another_id == current_user()['id'] || is_friend($another_id);
@@ -364,12 +367,15 @@ SQL;
 
 $app->get('/diary/entries/:account_name', function ($account_name) use ($app) {
     authenticated();
+
     $owner = user_from_account($account_name);
+
     if (permitted($owner['id'])) {
         $query = 'SELECT * FROM entries WHERE user_id = ? ORDER BY created_at DESC LIMIT 20';
     } else {
         $query = 'SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at DESC LIMIT 20';
     }
+
     $entries = array();
     $stmt = db_execute($query, array($owner['id']));
     while ($entry = $stmt->fetch()) {
