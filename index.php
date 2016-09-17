@@ -139,8 +139,16 @@ function authenticated()
 
 function get_user($user_id)
 {
+    global $redis;
+
+    if ($user = $redis->get('users:'.$user_id)) {
+        return json_decode($user, true);
+    }
+
     $user = db_execute('SELECT * FROM users WHERE id = ?', array($user_id))->fetch();
     if (!$user) abort_content_not_found();
+
+    $redis->set('users:'.$user_id, json_encode($user));
     return $user;
 }
 
