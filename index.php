@@ -233,9 +233,7 @@ $app->get('/', function () use ($app, $redis) {
     $entries = [];
     while ($entry = $stmt->fetch()) {
         $entry['is_private'] = ($entry['private'] == 1);
-        list($title, $content) = preg_split('/\n/', $entry['body'], 2);
-        $entry['title'] = $title;
-        $entry['content'] = $content;
+        $entry['content']    = preg_split('/\n/', $entry['body'], 2)[1];
         $entries[] = $entry;
     }
 
@@ -255,7 +253,6 @@ SQL;
             e.id,
             e.user_id,
             e.private,
-            e.body,
             e.created_at
         FROM entries
         WHERE (
@@ -319,13 +316,11 @@ $app->get('/profile/:account_name', function ($account_name) use ($app) {
     } else {
         $query = 'SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5';
     }
-    $entries = array();
-    $stmt = db_execute($query, array($owner['id']));
+    $entries = [];
+    $stmt = db_execute($query, [$owner['id']]);
     while ($entry = $stmt->fetch()) {
         $entry['is_private'] = ($entry['private'] == 1);
-        list($title, $content) = preg_split('/\n/', $entry['body'], 2);
-        $entry['title'] = $title;
-        $entry['content'] = $content;
+        $entry['content']    = preg_split('/\n/', $entry['body'], 2)[1];
         $entries[] = $entry;
     }
     mark_footprint($owner['id']);
@@ -377,13 +372,11 @@ $app->get('/diary/entries/:account_name', function ($account_name) use ($app) {
         $query = 'SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at DESC LIMIT 20';
     }
 
-    $entries = array();
-    $stmt = db_execute($query, array($owner['id']));
+    $entries = [];
+    $stmt = db_execute($query, [$owner['id']]);
     while ($entry = $stmt->fetch()) {
         $entry['is_private'] = ($entry['private'] == 1);
-        list($title, $content) = preg_split('/\n/', $entry['body'], 2);
-        $entry['title'] = $title;
-        $entry['content'] = $content;
+        $entry['content']    = preg_split('/\n/', $entry['body'], 2)[1];
         $entries[] = $entry;
     }
     mark_footprint($owner['id']);
@@ -398,15 +391,20 @@ $app->get('/diary/entries/:account_name', function ($account_name) use ($app) {
 $app->get('/diary/entry/:entry_id', function ($entry_id) use ($app) {
     authenticated();
     $entry = db_execute('SELECT * FROM entries WHERE id = ?', array($entry_id))->fetch();
-    if (!$entry) abort_content_not_found();
-    list($title, $content) = preg_split('/\n/', $entry['body'], 2);
-    $entry['title'] = $title;
-    $entry['content'] = $content;
+
+    if (!$entry) {
+        abort_content_not_found();
+    }
+
+    $entry['content']    = preg_split('/\n/', $entry['body'], 2)[1];
     $entry['is_private'] = ($entry['private'] == 1);
+
     $owner = get_user($entry['user_id']);
+
     if ($entry['is_private'] && !permitted($owner['id'])) {
         abort_permission_denied();
     }
+
     $comments = db_execute('SELECT * FROM comments WHERE entry_id = ?', array($entry['id']))->fetchAll();
     mark_footprint($owner['id']);
     $locals = [
@@ -419,26 +417,33 @@ $app->get('/diary/entry/:entry_id', function ($entry_id) use ($app) {
 
 $app->post('/diary/entry', function () use ($app) {
     authenticated();
-    $query = 'INSERT INTO entries (user_id, private, body) VALUES (?,?,?)';
+    $query = 'INSERT INTO entries (user_id, private, body, title) VALUES (?,?,?,?)';
     $params = $app->request->params();
     $title = isset($params['title']) ? $params['title'] : "タイトルなし";
     $content = isset($params['content']) ? $params['content'] : "";
     $body = $title . "\n" . $content;
-    db_execute($query, array(current_user()['id'], (isset($params['private']) ? '1' : '0'), $body));
+    db_execute($query, [current_user()['id'], (isset($params['private']) ? '1' : '0'), $body, $title]);
     $app->redirect('/diary/entries/'.current_user()['account_name']);
 });
 
-$app->post('/diary/comment/:entry_id', function ($entry_id) use ($app) {
+$app->post('/diary/comment/:entry_id', function ($entry_id) use ($app, $redis) {
     authenticated();
-    $entry = db_execute('SELECT * FROM entries WHERE id = ?', array($entry_id))->fetch();
-    if (!$entry) abort_content_not_found();
-    $entry['is_private'] = ($entry['private'] == 1);
-    if ($entry['is_private'] && !permitted($entry['user_id'])) {
+    $entry = db_execute('SELECT * FROM entries WHERE id = ?', [$entry_id])->fetch();
+    /*$entryIsPrivate = $redis->get('entry:private:'.$entry_id);
+    $entryUserId    = $redis->get('entry:user_id:'.$entry_id);*/
+
+    if (!$entry/*$entryUserId*/) {
+        abort_content_not_found();
+    }
+    $entry['is_private'] = ($entry['private'] == 1);//($entryIsPrivate == 1);
+
+    if ($entry['is_private'] && !permitted($entry['user_id']/*$entryUserId*/)) {
         abort_permission_denied();
     }
+
     $query = 'INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)';
     $params = $app->request->params();
-    db_execute($query, array($entry['id'], current_user()['id'], $params['comment']));
+    db_execute($query, [$entry['id'], current_user()['id'], $params['comment']]);
     $app->redirect('/diary/entry/'.$entry['id']);
 });
 

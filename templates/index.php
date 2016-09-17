@@ -63,7 +63,7 @@
       <ul class="list-group">
         <?php $entry_owner = get_user($entry['user_id']) ?>
         <li class="list-group-item entry-owner"><a href="/diary/entries/<?php h($entry_owner['account_name']) ?>"><?php h($entry_owner['nick_name']) ?>さん</a>:
-        <li class="list-group-item entry-title"><a href="/diary/entry/<?php h($entry['id']) ?>"><?php h(preg_split('/\n/', $entry['body'])[0]) ?></a>
+        <li class="list-group-item entry-title"><a href="/diary/entry/<?php h($entry['id']) ?>"><?php h($entry['title']) ?></a>
         <li class="list-group-item entry-created-at">投稿時刻:<?php h($entry['created_at']) ?>
       </ul>
     </div>
