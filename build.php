@@ -44,3 +44,9 @@ foreach ($entries as $entry) {
     $redis->set('entry:private:'.$id, $entry['private']);
     $redis->set('entry:user_id:'.$id, $entry['user_id']);
 }
+
+/* ユーザデータをキャッシュする */
+$users = db_execute('SELECT * FROM users');
+foreach ($users as $user) {
+    $redis->set('users:'.$user['id'], json_encode($user));
+}
