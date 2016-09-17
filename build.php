@@ -36,10 +36,11 @@ function db_execute($query, $args = [])
     return $stmt;
 }
 
-/* 記事がプライベートかどうかをキャッシュする */
+/* 記事データをキャッシュする */
 // UPDATEかからないのでINSERTのときだけキャッシュ更新すればよさげ
-$entrieFlags = db_execute('SELECT id, private FROM entries')->fetchAll();
-foreach ($entrieFlags as $entrieFlag) {
-    $redis->set('entry:private:'.$entrieFlag['id'], $entrieFlag['private']);
+$entries = db_execute('SELECT id, private, user_id FROM entries')->fetchAll();
+foreach ($entries as $entry) {
+    $id = $entry['id'];
+    $redis->set('entry:private:'.$id, $entry['private']);
+    $redis->set('entry:user_id:'.$id, $entry['user_id']);
 }
-
