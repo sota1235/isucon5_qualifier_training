@@ -274,11 +274,20 @@ SQL;
     $comments_of_friends = [];
     $stmt = db_execute('SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000');
     while ($comment = $stmt->fetch()) {
-        if (!is_friend($comment['user_id'])) continue;
+        if (!is_friend($comment['user_id'])) {
+            continue;
+        }
+
         $entryId        = $comment['entry_id'];
         $entryIsPrivate = $redis->get('entry:private:'.$entryId) == 1;
         $entryUserId    = $redis->get('entry:user_id:'.$entryId);
-        if ($entryIsPrivate && !permitted($entryUserId)) continue;
+
+        if ($entryIsPrivate && !permitted($entryUserId)) {
+            continue;
+        }
+
+        $comment['entry_owner_id'] = $entryUserId;
+
         $comments_of_friends[] = $comment;
         if (sizeof($comments_of_friends) >= 10) break;
     }
